@@ -1,0 +1,40 @@
+name: casio-discount-watch
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: casio-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check website and send alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MIN_DISCOUNT: ${{ vars.MIN_DISCOUNT || '10' }}
+        run: python main.py --once
+
+      - name: Save memory of seen discounts
+        run: |
+          if [ -f seen_discounts.json ]; then
+            git config user.name "watcher-bot"
+            git config user.email "watcher-bot@users.noreply.github.com"
+            git add seen_discounts.json
+            git diff --cached --quiet || (git commit -m "update state" && git push)
+          fi
